@@ -1,0 +1,12 @@
+torch
+torchvision
+torchaudio
+transformers
+datasets
+peft
+trl
+accelerate
+huggingface_hub
+pandas
+notebook
+ipywidgets
