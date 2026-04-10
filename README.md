@@ -1,10 +1,11 @@
 # Customer Support LLM Fine-Tuning
 
-This project fine-tunes Qwen2.5-0.5B-Instruct for customer-support style responses using a three-notebook pipeline:
+This project fine-tunes Qwen2.5-0.5B-Instruct for customer-support style responses using a four-notebook pipeline:
 
 1. Data preparation and dataset construction
 2. LoRA SFT training
 3. DPO preference optimization
+4. Base model + DPO adapter merge and export
 
 The work is based on the Bitext customer support dataset and runs on Apple MPS (with CUDA/CPU fallback logic in the notebooks).
 
@@ -83,11 +84,37 @@ Notebook: [notebooks/DPO_training.ipynb](notebooks/DPO_training.ipynb)
 - Saved DPO model artifacts to:
     - models/dpo_model/dpo_final
 
+### 4) Merge DPO adapter into base model
+
+Notebook: [notebooks/base_dpo_merge.ipynb](notebooks/base_dpo_merge.ipynb)
+
+- Loaded tokenizer from the trained DPO adapter directory:
+    - models/dpo_model/dpo_final
+- Loaded original base model in float32:
+    - Qwen/Qwen2.5-0.5B-Instruct
+    - float32 is used to avoid precision loss during merge.
+- Mounted the DPO LoRA adapter on top of the base model with:
+    - is_trainable=False
+    - eval mode before merge
+- Performed adapter folding using PEFT merge flow:
+    - merge_and_unload()
+    - removed adapter structure to produce a plain CausalLM model
+- Verified merge integrity:
+    - checked that no modules containing "lora" remained
+- Ran deterministic post-merge inference checks on sample customer-support queries.
+- Saved merged full model + tokenizer to:
+    - models/final_model
+- Reloaded the saved merged model from disk to verify successful serialization.
+- Included optional publishing flow to Hugging Face Hub:
+    - login via HF_TOKEN
+    - push merged model and tokenizer to a target repo
+
 ## Reproducible Run Order
 
 1. [notebooks/data_preparation.ipynb](notebooks/data_preparation.ipynb)
 2. [notebooks/LoRA_SFT_training.ipynb](notebooks/LoRA_SFT_training.ipynb)
 3. [notebooks/DPO_training.ipynb](notebooks/DPO_training.ipynb)
+4. [notebooks/base_dpo_merge.ipynb](notebooks/base_dpo_merge.ipynb)
 
 ## Setup
 
@@ -103,6 +130,8 @@ Optional authentication (if pushing/pulling private assets on Hugging Face Hub):
 huggingface-cli login
 # or
 export HF_TOKEN=hf_...
+# or
+login(os.getenv("HF_TOKEN"))
 ```
 
 ## Current Artifact Layout
@@ -114,4 +143,4 @@ export HF_TOKEN=hf_...
 - Model artifacts:
     - models/sft_model/sft_final
     - models/dpo_model/dpo_final
-    - models/merged_final_model
+    - models/final_model
